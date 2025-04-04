@@ -5,10 +5,12 @@ import { ChatCompletionContentPartImage } from "openai/resources/chat";
 export class LLMHelper {
   private openai: OpenAI;
   private model: string;
+  private codeLanguage: string;
 
-  constructor(apiKey: string, model: string) {
+  constructor(apiKey: string, model: string, codeLanguage: string) {
     this.openai = new OpenAI({ apiKey });
     this.model = model;
+    this.codeLanguage = codeLanguage;
   }
 
   private async fileToBase64(imagePath: string) {
@@ -90,7 +92,9 @@ export class LLMHelper {
   }
 
   public async generateSolution(problemInfo: any) {
-    const prompt = `Given this coding problem:
+    const prompt = `Given this coding problem use \`${
+      this.codeLanguage
+    } language\`:
     ${JSON.stringify(problemInfo, null, 2)}
     
     Please provide a solution in the following JSON format:

@@ -20,10 +20,11 @@ export class ProcessingHelper {
     this.appState = appState;
     const apiKey = process.env.OPENAI_API_KEY;
     const model = process.env.CHAT_MODEL || "gpt-4-turbo";
+    const codeLanguage = process.env.CODE_LANGUAGE || "any";
     if (!apiKey) {
       throw new Error("OPENAI_API_KEY not found in environment variables");
     }
-    this.llmHelper = new LLMHelper(apiKey, model);
+    this.llmHelper = new LLMHelper(apiKey, model, codeLanguage);
   }
 
   public async processScreenshots(): Promise<void> {

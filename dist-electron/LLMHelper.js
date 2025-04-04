@@ -85,7 +85,7 @@ class LLMHelper {
         }
     }
     async generateSolution(problemInfo) {
-        const prompt = `Given this coding problem:
+        const prompt = `Given this coding problem use \`java language\`:
     ${JSON.stringify(problemInfo, null, 2)}
     
     Please provide a solution in the following JSON format:
