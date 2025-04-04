@@ -18,11 +18,12 @@ class ProcessingHelper {
     currentExtraProcessingAbortController = null;
     constructor(appState) {
         this.appState = appState;
-        const apiKey = process.env.GEMINI_API_KEY;
+        const apiKey = process.env.OPENAI_API_KEY;
+        const model = process.env.CHAT_MODEL || "gpt-4-turbo";
         if (!apiKey) {
-            throw new Error("GEMINI_API_KEY not found in environment variables");
+            throw new Error("OPENAI_API_KEY not found in environment variables");
         }
-        this.llmHelper = new LLMHelper_1.LLMHelper(apiKey);
+        this.llmHelper = new LLMHelper_1.LLMHelper(apiKey, model);
     }
     async processScreenshots() {
         const mainWindow = this.appState.getMainWindow();
@@ -30,7 +31,9 @@ class ProcessingHelper {
             return;
         const view = this.appState.getView();
         if (view === "queue") {
-            const screenshotQueue = this.appState.getScreenshotHelper().getScreenshotQueue();
+            const screenshotQueue = this.appState
+                .getScreenshotHelper()
+                .getScreenshotQueue();
             if (screenshotQueue.length === 0) {
                 mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.NO_SCREENSHOTS);
                 return;
@@ -59,7 +62,9 @@ class ProcessingHelper {
         }
         else {
             // Debug mode
-            const extraScreenshotQueue = this.appState.getScreenshotHelper().getExtraScreenshotQueue();
+            const extraScreenshotQueue = this.appState
+                .getScreenshotHelper()
+                .getExtraScreenshotQueue();
             if (extraScreenshotQueue.length === 0) {
                 console.log("No extra screenshots to process");
                 mainWindow.webContents.send(this.appState.PROCESSING_EVENTS.NO_SCREENSHOTS);

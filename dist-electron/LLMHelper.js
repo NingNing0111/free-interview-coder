@@ -4,33 +4,26 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LLMHelper = void 0;
-const generative_ai_1 = require("@google/generative-ai");
+const openai_1 = __importDefault(require("openai"));
 const fs_1 = __importDefault(require("fs"));
 class LLMHelper {
+    openai;
     model;
-    constructor(apiKey) {
-        const genAI = new generative_ai_1.GoogleGenerativeAI(apiKey);
-        this.model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    constructor(apiKey, model) {
+        this.openai = new openai_1.default({ apiKey });
+        this.model = model;
     }
-    async fileToGenerativePart(imagePath) {
+    async fileToBase64(imagePath) {
         const imageData = await fs_1.default.promises.readFile(imagePath);
-        return {
-            inlineData: {
-                data: imageData.toString("base64"),
-                mimeType: "image/png"
-            }
-        };
+        return imageData.toString("base64");
     }
     cleanJsonResponse(text) {
-        // Remove markdown code block syntax if present
-        text = text.replace(/^```(?:json)?\n/, '').replace(/\n```$/, '');
-        // Remove any leading/trailing whitespace
-        text = text.trim();
-        return text;
+        text = text.replace(/^```(?:json)?\n/, "").replace(/\n```$/, "");
+        return text.trim();
     }
     async extractProblemFromImages(imagePaths) {
         try {
-            const imageParts = await Promise.all(imagePaths.map(path => this.fileToGenerativePart(path)));
+            const imageParts = await Promise.all(imagePaths.map((path) => this.fileToBase64(path)));
             const prompt = `You are a coding problem analyzer. Please analyze these images of a coding problem and extract the following information in JSON format:
       {
         "problem_statement": "The complete problem statement",
@@ -54,9 +47,36 @@ class LLMHelper {
         ]
       }
       Important: Return ONLY the JSON object, without any markdown formatting or code blocks.`;
-            const result = await this.model.generateContent([prompt, ...imageParts]);
-            const response = await result.response;
-            const text = this.cleanJsonResponse(response.text());
+            let imageLists = imageParts.map((image) => {
+                let img = {
+                    type: "image_url",
+                    image_url: {
+                        url: `data:image/png;base64,${image}`,
+                    },
+                };
+                return img;
+            });
+            const result = await this.openai.chat.completions.create({
+                model: this.model,
+                messages: [
+                    {
+                        role: "system",
+                        content: "You are a helpful AI assistant.",
+                    },
+                    {
+                        role: "user",
+                        content: [
+                            {
+                                type: "text",
+                                text: prompt,
+                            },
+                            ...imageLists,
+                        ],
+                    },
+                ],
+                max_tokens: 1000,
+            });
+            const text = this.cleanJsonResponse(result.choices[0].message.content);
             return JSON.parse(text);
         }
         catch (error) {
@@ -88,14 +108,17 @@ class LLMHelper {
       }
     }
     Important: Return ONLY the JSON object, without any markdown formatting or code blocks.`;
-        const result = await this.model.generateContent(prompt);
-        const response = await result.response;
-        const text = this.cleanJsonResponse(response.text());
+        const result = await this.openai.chat.completions.create({
+            model: this.model,
+            messages: [{ role: "user", content: prompt }],
+            max_tokens: 1500,
+        });
+        const text = this.cleanJsonResponse(result.choices[0].message.content);
         return JSON.parse(text);
     }
     async debugSolutionWithImages(problemInfo, currentCode, debugImagePaths) {
         try {
-            const imageParts = await Promise.all(debugImagePaths.map(path => this.fileToGenerativePart(path)));
+            const imageParts = await Promise.all(debugImagePaths.map((path) => this.fileToBase64(path)));
             const prompt = `You are a coding problem debugger. Given:
       1. The original problem: ${JSON.stringify(problemInfo, null, 2)}
       2. The current solution: ${currentCode}
@@ -124,9 +147,36 @@ class LLMHelper {
         }
       }
       Important: Return ONLY the JSON object, without any markdown formatting or code blocks.`;
-            const result = await this.model.generateContent([prompt, ...imageParts]);
-            const response = await result.response;
-            const text = this.cleanJsonResponse(response.text());
+            let imageLists = imageParts.map((image) => {
+                let img = {
+                    type: "image_url",
+                    image_url: {
+                        url: `data:image/png;base64,${image}`,
+                    },
+                };
+                return img;
+            });
+            const result = await this.openai.chat.completions.create({
+                model: this.model,
+                messages: [
+                    {
+                        role: "system",
+                        content: "You are a helpful AI assistant.",
+                    },
+                    {
+                        role: "user",
+                        content: [
+                            {
+                                type: "text",
+                                text: prompt,
+                            },
+                            ...imageLists,
+                        ],
+                    },
+                ],
+                max_tokens: 2000,
+            });
+            const text = this.cleanJsonResponse(result.choices[0].message.content);
             return JSON.parse(text);
         }
         catch (error) {

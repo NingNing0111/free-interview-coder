@@ -1,36 +1,32 @@
-import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai"
-import fs from "fs"
+import OpenAI from "openai";
+import fs from "fs";
+import { ChatCompletionContentPartImage } from "openai/resources/chat";
 
 export class LLMHelper {
-  private model: GenerativeModel
+  private openai: OpenAI;
+  private model: string;
 
-  constructor(apiKey: string) {
-    const genAI = new GoogleGenerativeAI(apiKey)
-    this.model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" })
+  constructor(apiKey: string, model: string) {
+    this.openai = new OpenAI({ apiKey });
+    this.model = model;
   }
 
-  private async fileToGenerativePart(imagePath: string) {
-    const imageData = await fs.promises.readFile(imagePath)
-    return {
-      inlineData: {
-        data: imageData.toString("base64"),
-        mimeType: "image/png"
-      }
-    }
+  private async fileToBase64(imagePath: string) {
+    const imageData = await fs.promises.readFile(imagePath);
+    return imageData.toString("base64");
   }
 
   private cleanJsonResponse(text: string): string {
-    // Remove markdown code block syntax if present
-    text = text.replace(/^```(?:json)?\n/, '').replace(/\n```$/, '');
-    // Remove any leading/trailing whitespace
-    text = text.trim();
-    return text;
+    text = text.replace(/^```(?:json)?\n/, "").replace(/\n```$/, "");
+    return text.trim();
   }
 
   public async extractProblemFromImages(imagePaths: string[]) {
     try {
-      const imageParts = await Promise.all(imagePaths.map(path => this.fileToGenerativePart(path)))
-      
+      const imageParts = await Promise.all(
+        imagePaths.map((path) => this.fileToBase64(path))
+      );
+
       const prompt = `You are a coding problem analyzer. Please analyze these images of a coding problem and extract the following information in JSON format:
       {
         "problem_statement": "The complete problem statement",
@@ -53,15 +49,43 @@ export class LLMHelper {
           }
         ]
       }
-      Important: Return ONLY the JSON object, without any markdown formatting or code blocks.`
+      Important: Return ONLY the JSON object, without any markdown formatting or code blocks.`;
 
-      const result = await this.model.generateContent([prompt, ...imageParts])
-      const response = await result.response
-      const text = this.cleanJsonResponse(response.text())
-      return JSON.parse(text)
+      let imageLists = imageParts.map((image) => {
+        let img: ChatCompletionContentPartImage = {
+          type: "image_url",
+          image_url: {
+            url: `data:image/png;base64,${image}`,
+          },
+        };
+        return img;
+      });
+      const result = await this.openai.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful AI assistant.",
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: prompt,
+              },
+              ...imageLists,
+            ],
+          },
+        ],
+        max_tokens: 1000,
+      });
+
+      const text = this.cleanJsonResponse(result.choices[0].message.content);
+      return JSON.parse(text);
     } catch (error) {
-      console.error("Error extracting problem from images:", error)
-      throw error
+      console.error("Error extracting problem from images:", error);
+      throw error;
     }
   }
 
@@ -88,18 +112,28 @@ export class LLMHelper {
         ]
       }
     }
-    Important: Return ONLY the JSON object, without any markdown formatting or code blocks.`
+    Important: Return ONLY the JSON object, without any markdown formatting or code blocks.`;
 
-    const result = await this.model.generateContent(prompt)
-    const response = await result.response
-    const text = this.cleanJsonResponse(response.text())
-    return JSON.parse(text)
+    const result = await this.openai.chat.completions.create({
+      model: this.model,
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 1500,
+    });
+
+    const text = this.cleanJsonResponse(result.choices[0].message.content);
+    return JSON.parse(text);
   }
 
-  public async debugSolutionWithImages(problemInfo: any, currentCode: string, debugImagePaths: string[]) {
+  public async debugSolutionWithImages(
+    problemInfo: any,
+    currentCode: string,
+    debugImagePaths: string[]
+  ) {
     try {
-      const imageParts = await Promise.all(debugImagePaths.map(path => this.fileToGenerativePart(path)))
-      
+      const imageParts = await Promise.all(
+        debugImagePaths.map((path) => this.fileToBase64(path))
+      );
+
       const prompt = `You are a coding problem debugger. Given:
       1. The original problem: ${JSON.stringify(problemInfo, null, 2)}
       2. The current solution: ${currentCode}
@@ -127,15 +161,44 @@ export class LLMHelper {
           "explanation": "Explanation of the changes made"
         }
       }
-      Important: Return ONLY the JSON object, without any markdown formatting or code blocks.`
+      Important: Return ONLY the JSON object, without any markdown formatting or code blocks.`;
 
-      const result = await this.model.generateContent([prompt, ...imageParts])
-      const response = await result.response
-      const text = this.cleanJsonResponse(response.text())
-      return JSON.parse(text)
+      let imageLists = imageParts.map((image) => {
+        let img: ChatCompletionContentPartImage = {
+          type: "image_url",
+          image_url: {
+            url: `data:image/png;base64,${image}`,
+          },
+        };
+        return img;
+      });
+
+      const result = await this.openai.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful AI assistant.",
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: prompt,
+              },
+              ...imageLists,
+            ],
+          },
+        ],
+        max_tokens: 2000,
+      });
+
+      const text = this.cleanJsonResponse(result.choices[0].message.content);
+      return JSON.parse(text);
     } catch (error) {
-      console.error("Error debugging solution with images:", error)
-      throw error
+      console.error("Error debugging solution with images:", error);
+      throw error;
     }
   }
-} 
+}

@@ -6,10 +6,11 @@
     "clean": "rimraf dist dist-electron",
     "dev": "vite",
     "build": "npm run clean && tsc && vite build",
+    "build:pro": "tsc && vite build",
     "preview": "vite preview",
     "electron:dev": "tsc -p electron/tsconfig.json && electron .",
     "app:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env electron .\"",
-    "app:build": "npm run build && electron-builder",
+    "app:build": "npm run build:pro && electron-builder",
     "watch": "tsc -p electron/tsconfig.json --watch"
   },
   "build": {
@@ -86,7 +87,6 @@
     "wait-on": "^8.0.1"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.2.1",
     "@radix-ui/react-dialog": "^1.1.2",
     "@radix-ui/react-toast": "^1.2.2",
     "axios": "^1.7.7",
@@ -95,6 +95,7 @@
     "diff": "^7.0.0",
     "form-data": "^4.0.1",
     "lucide-react": "^0.460.0",
+    "openai": "^4.91.1",
     "react": "^18.3.1",
     "react-code-blocks": "^0.1.6",
     "react-dom": "^18.3.1",
